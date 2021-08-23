@@ -122,4 +122,4 @@ height = pyautogui.size()[1]
 
 if __name__ == "__main__":
     threading.Thread(target=mem_proc("csgo.exe").GetCurrentPID, daemon=True).start()
-    VirtualWindow(400, 300, "Caca", True).DoWork()
+    VirtualWindow(400, 300, "Overlay", True).DoWork()
