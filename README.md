@@ -3,9 +3,14 @@ Basically a way to hook your draw over programs.
 
 # Usage
 pip install glfw
+
 pip install pyautogui
+
 pip install freetype-py
+
 pip install matplotlib
+
+
 
 # Changelog
 # Version 2
