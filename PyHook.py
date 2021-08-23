@@ -4,13 +4,25 @@ __version__: str = "0.3"
 import os, sys
 import glfw
 import time
-import pyautogui
-import psutil
+try:
+    import pyautogui
+except ImportError:
+    os.system("pip install pyautogui")
+try:
+    import psutil
+except ImportError:
+    os.system("pip install psutil")
+try:
+    import freetype
+except ImportError:
+    os.system("pip install freetype-py")
 import threading
-import freetype
 import ctypes
 from OpenGL.GL import *
 from OpenGL.GLU import *
+if sys.platform == "win32":
+    import win32api
+    import win32gui
 
 class CharacterSlot:
     def __init__(self, texture, glyph):
