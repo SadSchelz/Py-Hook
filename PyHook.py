@@ -21,8 +21,9 @@ except ImportError:
 import threading
 import ctypes
 from OpenGL.GL import *
-#from OpenGL.GLU import *
+from OpenGL.GLU import *
 from OpenGL.GL.shaders import *
+from OpenGL.GLUT import *
 if sys.platform == "win32":
     import win32api
     import win32gui
@@ -31,11 +32,10 @@ vertex_src = """
 # version 330
 layout(location = 0) in vec3 a_position;
 layout(location = 1) in vec3 a_color;
-uniform mat4 rotation;
 out vec3 v_color;
 void main()
 {
-    gl_Position = rotation * vec4(a_position, 1.0);
+    gl_Position = vec4(a_position, 1.0);
     v_color = a_color;
 }
 """
@@ -50,9 +50,26 @@ void main()
 }
 """
 
+def _shader(vertex_src: str, fragments_src: str, vertices: list, indices: list or None, EBO_buffer: bool):
+    shader = compileProgram(compileShader(vertex_src, GL_VERTEX_SHADER), compileShader(fragment_src, GL_FRAGMENT_SHADER))
 
-def win_resolution():
-    return pyautogui.size()
+    VBO = glGenBuffers(1)
+    glBindBuffer(GL_ARRAY_BUFFER, VBO)
+    glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
+
+    if EBO_buffer == False: pass
+    else:
+        EBO = glGenBuffers(1)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.nbytes, indices, GL_STATIC_DRAW)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
+
+    glEnableVertexAttribArray(0)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 24, ctypes.c_void_p(0))
+
+    glEnableVertexAttribArray(1)
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 24, ctypes.c_void_p(12))
+    glUseProgram(shader)
 
 class mem_proc:
     def __init__(self, proc_name: str):
@@ -85,6 +102,14 @@ class Draw:
     def __init__(self):
         pass
 
+    def vertex_array(self, array: list):
+        return numpy.array(array, dtype=numpy.float32)
+    
+    def indices(self, array: list):
+        return numpy.array(self.indices, dtype=numpy.uint32)
+
+    
+
     def _Text(self, window, message: str, pos_x: int, pos_y: int, color: tuple, font: str):
         pass
 
@@ -92,8 +117,27 @@ class Draw:
     def _Image(self, width: int, height: int, alpha: bool):
         pass
 
-    def _Shapes(self):
+    def _Line(self):
+        vertices = [
+            -0.5, -0.5, 0.0, 
+            0.5, -0.5, 0.0, 
+            0.0, 0.5, 0.0
+        ]
+
+        color = [
+            1.0, 0.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 0.0, 1.0
+        ]
+        self.vertex_array(vertices)
+        self.vertex_array(color)
+
+        glEnable(GL_VERTEX_ARRAY)
+        glVertexPointer(3, GL_FLOAT, 0, vertices)
+
+    def _3D_Object(self, vertices, color):
         pass
+
 
 def window_resize(window, width: int, height: int):
     glViewport(0, 0, width, height)
@@ -129,57 +173,14 @@ class VirtualWindow:
 
         glfw.make_context_current(self._windll)
 
-        vertices = [-0.5, -0.5, 0.5, 1.0, 0.0, 0.0,
-             0.5, -0.5, 0.5, 0.0, 1.0, 0.0,
-             0.5,  0.5, 0.5, 0.0, 0.0, 1.0,
-            -0.5,  0.5, 0.5, 1.0, 1.0, 1.0,
+        vertices = [-0.5, -0.5, 0.0, 1.0, 0.0, 0.0,
+                    0.5, -0.5, 0.0, 0.0, 1.0, 0.0,
+                    -0.5,  0.5, 0.0, 0.0, 0.0, 1.0,
+                    0.5,  0.5, 0.0, 1.0, 1.0, 1.0]
 
-            -0.5, -0.5, -0.5, 1.0, 0.0, 0.0,
-             0.5, -0.5, -0.5, 0.0, 1.0, 0.0,
-             0.5,  0.5, -0.5, 0.0, 0.0, 1.0,
-            -0.5,  0.5, -0.5, 1.0, 1.0, 1.0]
-
-        self.indices = [0, 1, 2, 2, 3, 0,
-                4, 5, 6, 6, 7, 4,
-                4, 5, 1, 1, 0, 4,
-                6, 7, 3, 3, 2, 6,
-                5, 6, 2, 2, 1, 5,
-                7, 4, 0, 0, 3, 7]
-
-        vertices = numpy.array(vertices, dtype=numpy.float32)
-        self.indices = numpy.array(self.indices, dtype=numpy.uint32)
-
-        shader = compileProgram(compileShader(vertex_src, GL_VERTEX_SHADER), compileShader(fragment_src, GL_FRAGMENT_SHADER))
-
-        VBO = glGenBuffers(1)
-        glBindBuffer(GL_ARRAY_BUFFER, VBO)
-        glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
-
-        # Element Buffer Object
-        EBO = glGenBuffers(1)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices, GL_STATIC_DRAW)
-
-        glEnableVertexAttribArray(0)
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 24, ctypes.c_void_p(0))
-
-        glEnableVertexAttribArray(1)
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 24, ctypes.c_void_p(12))
-
-        glUseProgram(shader)
-        glEnable(GL_DEPTH_TEST)
-
-        self.rotation_loc = glGetUniformLocation(shader, "rotation")
-
-
-        # glBegin(GL_QUADS);
-        # glColor4f(1.0, 0.0, 0.0, 0.3)
-        # glVertex3f(-0.5, -0.5, 0)
-        # glVertex3f(+0.5, -0.5, 0)
-        # glVertex3f(+0.5, +0.5, 0)
-        # glVertex3f(-0.5, +0.5, 0)
-        # glEnd()
-
+        vertices = Draw().vertex_array(vertices)
+        _shader(vertex_src, fragment_src, vertices, None, False)
+        #self.rotation_loc = glGetUniformLocation(shader, "rotation")
 
     def DoWork(self):
         while not glfw.window_should_close(self._windll):
@@ -187,13 +188,9 @@ class VirtualWindow:
             glfw.poll_events()
             glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
 
-            rot_x = pyrr.Matrix44.from_x_rotation(0.5 * glfw.get_time())
-            rot_y = pyrr.Matrix44.from_y_rotation(0.8 * glfw.get_time())
-
-            glUniformMatrix4fv(self.rotation_loc, 1, GL_FALSE, pyrr.matrix44.multiply(rot_x, rot_y))
-
-            glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
-
+            #rot_x = pyrr.Matrix44.from_x_rotation(0.5 * glfw.get_time())
+            #rot_y = pyrr.Matrix44.from_y_rotation(0.8 * glfw.get_time())
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
             glfw.swap_buffers(self._windll)
             #if mem_proc("csgo.exe").GetProcPID() != mem_proc("csgo.exe").GetCurrentPID(): pass
         glfw.terminate()
