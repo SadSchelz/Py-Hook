@@ -12,6 +12,7 @@ Basically a way to hook your draw over programs.
 * Added resize function
 * Added basic cube with shaders
 * New processor optimisation 
+* Better flexibility
 
 # Version 0.3
 * Automatically install modules
