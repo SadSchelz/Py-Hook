@@ -1,5 +1,5 @@
 __author__: str = "Schelz"
-__version__: str = "0.5"
+__version__: str = "0.4"
 
 import os, sys
 import glfw
