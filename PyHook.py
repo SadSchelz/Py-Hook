@@ -170,16 +170,12 @@ class VirtualWindow:
 
         vertices = Draw().vertex_array(vertices)
         compile_shader('pink', vertices, None, False)
-        #self.rotation_loc = glGetUniformLocation(shader, "rotation")
 
     def DoWork(self):
         while not glfw.window_should_close(self._windll):
             time.sleep(0.01)
             glfw.poll_events()
             glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
-
-            #rot_x = pyrr.Matrix44.from_x_rotation(0.5 * glfw.get_time())
-            #rot_y = pyrr.Matrix44.from_y_rotation(0.8 * glfw.get_time())
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
             glfw.swap_buffers(self._windll)
             #if mem_proc("csgo.exe").GetProcPID() != mem_proc("csgo.exe").GetCurrentPID(): pass
