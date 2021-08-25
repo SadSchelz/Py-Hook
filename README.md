@@ -1,6 +1,5 @@
 # Py-Hook
 Basically a way to hook your draw over programs.
-![image](https://user-images.githubusercontent.com/67759165/130766045-de36da7a-7680-4522-b4c7-babb834eff42.png)
 
 # Changelog
 
