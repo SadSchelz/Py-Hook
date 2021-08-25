@@ -136,7 +136,9 @@ class VirtualWindow:
         if not glfw.init():
             raise Exception("glfw not created!")
 
-        ctypes.windll.shcore.SetProcessDpiAwareness(2) # windows 10
+        if not sys.platform == "win32": pass
+        else:
+            ctypes.windll.shcore.SetProcessDpiAwareness(2) # windows 10
         glfw.window_hint(glfw.DECORATED, glfw.FALSE)
         glfw.window_hint(glfw.TRANSPARENT_FRAMEBUFFER, glfw.TRUE)
         glfw.window_hint(glfw.FOCUS_ON_SHOW, glfw.TRUE)
