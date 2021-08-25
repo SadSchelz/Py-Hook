@@ -4,6 +4,8 @@ __version__: str = "0.3"
 import os, sys
 import glfw
 import time
+import numpy
+import pyrr
 try:
     import pyautogui
 except ImportError:
@@ -19,24 +21,35 @@ except ImportError:
 import threading
 import ctypes
 from OpenGL.GL import *
-from OpenGL.GLU import *
+#from OpenGL.GLU import *
+from OpenGL.GL.shaders import *
 if sys.platform == "win32":
     import win32api
     import win32gui
 
-class CharacterSlot:
-    def __init__(self, texture, glyph):
-        self.texture = texture
-        self.textureSize = (glyph.bitmap.width, glyph.bitmap.rows)
+vertex_src = """
+# version 330
+layout(location = 0) in vec3 a_position;
+layout(location = 1) in vec3 a_color;
+uniform mat4 rotation;
+out vec3 v_color;
+void main()
+{
+    gl_Position = rotation * vec4(a_position, 1.0);
+    v_color = a_color;
+}
+"""
 
-        if isinstance(glyph, freetype.GlyphSlot):
-            self.bearing = (glyph.bitmap_left, glyph.bitmap_top)
-            self.advance = glyph.advance.x
-        elif isinstance(glyph, freetype.BitmapGlyph):
-            self.bearing = (glyph.left, glyph.top)
-            self.advance = None
-        else:
-            raise RuntimeError('unknown glyph type')
+fragment_src = """
+# version 330
+in vec3 v_color;
+out vec4 out_color;
+void main()
+{
+    out_color = vec4(v_color, 1.0);
+}
+"""
+
 
 def win_resolution():
     return pyautogui.size()
@@ -82,6 +95,9 @@ class Draw:
     def _Shapes(self):
         pass
 
+def window_resize(window, width: int, height: int):
+    glViewport(0, 0, width, height)
+
 class VirtualWindow:
     def __init__(self, width: int, height: int, title: str, fullscreen: bool):
         super().__init__()
@@ -91,8 +107,9 @@ class VirtualWindow:
         ctypes.windll.shcore.SetProcessDpiAwareness(2) # windows 10
         glfw.window_hint(glfw.DECORATED, glfw.FALSE)
         glfw.window_hint(glfw.TRANSPARENT_FRAMEBUFFER, glfw.TRUE)
-        glfw.window_hint(glfw.FOCUS_ON_SHOW, glfw.FALSE)
-        #glfw.window_hint(glfw.GLFW_MOUSE_PASSTHROUGH, glfw.TRUE)
+        glfw.window_hint(glfw.FOCUS_ON_SHOW, glfw.TRUE)
+        glfw.window_hint(glfw.REFRESH_RATE, 10)
+        glfw.window_hint(glfw.FOCUSED, glfw.TRUE)
 
         self.monitor = glfw.get_primary_monitor() if fullscreen else None  # ??
         self._windll = glfw.create_window(width, height, title, None, None)
@@ -100,31 +117,83 @@ class VirtualWindow:
         self.size = glfw.get_window_size(self._windll)
         self.mode = glfw.get_video_mode(self.monitor)
 
-        glfw.set_window_pos(self._windll,
-            int(self.pos[0] + (self.mode.size.width - self.size[0]) / 2),
-            int(self.pos[1] + (self.mode.size.height - self.size[1]) / 2))
-
         if not self._windll:
             glfw.terminate()
             raise Exception("glfw not created!")
 
-        glfw.make_context_current(self._windll)
-        glDrawBuffer(GL_BACK);
-        glClearColor(0.0, 0.0, 0.0, 0.0)
+        glfw.set_window_pos(self._windll,
+            int(self.pos[0] + (self.mode.size.width - self.size[0]) / 2),
+            int(self.pos[1] + (self.mode.size.height - self.size[1]) / 2))
+        
+        glfw.set_window_size_callback(self._windll, window_resize)
 
-        glBegin(GL_QUADS);
-        glColor4f(1.0, 0.0, 0.0, 0.3)
-        glVertex3f(-0.5, -0.5, 0)
-        glVertex3f(+0.5, -0.5, 0)
-        glVertex3f(+0.5, +0.5, 0)
-        glVertex3f(-0.5, +0.5, 0)
-        glEnd()
+        glfw.make_context_current(self._windll)
+
+        vertices = [-0.5, -0.5, 0.5, 1.0, 0.0, 0.0,
+             0.5, -0.5, 0.5, 0.0, 1.0, 0.0,
+             0.5,  0.5, 0.5, 0.0, 0.0, 1.0,
+            -0.5,  0.5, 0.5, 1.0, 1.0, 1.0,
+
+            -0.5, -0.5, -0.5, 1.0, 0.0, 0.0,
+             0.5, -0.5, -0.5, 0.0, 1.0, 0.0,
+             0.5,  0.5, -0.5, 0.0, 0.0, 1.0,
+            -0.5,  0.5, -0.5, 1.0, 1.0, 1.0]
+
+        self.indices = [0, 1, 2, 2, 3, 0,
+                4, 5, 6, 6, 7, 4,
+                4, 5, 1, 1, 0, 4,
+                6, 7, 3, 3, 2, 6,
+                5, 6, 2, 2, 1, 5,
+                7, 4, 0, 0, 3, 7]
+
+        vertices = numpy.array(vertices, dtype=numpy.float32)
+        self.indices = numpy.array(self.indices, dtype=numpy.uint32)
+
+        shader = compileProgram(compileShader(vertex_src, GL_VERTEX_SHADER), compileShader(fragment_src, GL_FRAGMENT_SHADER))
+
+        VBO = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, VBO)
+        glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
+
+        # Element Buffer Object
+        EBO = glGenBuffers(1)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices, GL_STATIC_DRAW)
+
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 24, ctypes.c_void_p(0))
+
+        glEnableVertexAttribArray(1)
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 24, ctypes.c_void_p(12))
+
+        glUseProgram(shader)
+        glEnable(GL_DEPTH_TEST)
+
+        self.rotation_loc = glGetUniformLocation(shader, "rotation")
+
+
+        # glBegin(GL_QUADS);
+        # glColor4f(1.0, 0.0, 0.0, 0.3)
+        # glVertex3f(-0.5, -0.5, 0)
+        # glVertex3f(+0.5, -0.5, 0)
+        # glVertex3f(+0.5, +0.5, 0)
+        # glVertex3f(-0.5, +0.5, 0)
+        # glEnd()
+
 
     def DoWork(self):
         while not glfw.window_should_close(self._windll):
-            time.sleep(0.05)
-            #glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+            time.sleep(0.01)
             glfw.poll_events()
+            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
+
+            rot_x = pyrr.Matrix44.from_x_rotation(0.5 * glfw.get_time())
+            rot_y = pyrr.Matrix44.from_y_rotation(0.8 * glfw.get_time())
+
+            glUniformMatrix4fv(self.rotation_loc, 1, GL_FALSE, pyrr.matrix44.multiply(rot_x, rot_y))
+
+            glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
+
             glfw.swap_buffers(self._windll)
             #if mem_proc("csgo.exe").GetProcPID() != mem_proc("csgo.exe").GetCurrentPID(): pass
         glfw.terminate()
