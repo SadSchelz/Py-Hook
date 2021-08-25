@@ -3,7 +3,12 @@ Basically a way to hook your draw over programs.
 
 # Changelog
 
-# Verstion 0.3
+# Verstion 0.4
+* Added focus on show
+* Added resize function
+* Added basic cube with shaders
+
+# Version 0.3
 * Automatically install modules
 
 # Version 0.2
